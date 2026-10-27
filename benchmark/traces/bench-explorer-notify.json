@@ -1,0 +1,50 @@
+{
+  "session_id": "bench-explorer-notify",
+  "tool_calls": [
+    {
+      "name": "list_files",
+      "input": {
+        "directory": "notify"
+      },
+      "result": "channels.py\nretry.py\ntemplates.py"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "notify/channels.py"
+      },
+      "result": "\"\"\"Notify channels.\"\"\"\n\ndef send_email(to, subject, body):\n    \"\"\"Queue an email notification.\"\"\"\n    return {\"to\": to, \"subject\": subject}\n\ndef send_sms(to, body):\n    \"\"\"Queue an SMS notification.\"\"\"\n    return {\"to\": to, \"body\": body}\n"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "notify/retry.py"
+      },
+      "result": "\"\"\"Retry policy.\"\"\"\n\ndef backoff(attempt):\n    \"\"\"Seconds to wait before a retry.\"\"\"\n    return 2 ** attempt\n"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "notify/templates.py"
+      },
+      "result": "\"\"\"Notify templates.\"\"\"\n\ndef render(name, ctx):\n    \"\"\"Render a named template with context.\"\"\"\n    return name.format(**ctx)\n"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "notify/channels.py"
+      },
+      "result": "\"\"\"Notify channels.\"\"\"\n\ndef send_email(to, subject, body):\n    \"\"\"Queue an email notification.\"\"\"\n    return {\"to\": to, \"subject\": subject}\n\ndef send_sms(to, body):\n    \"\"\"Queue an SMS notification.\"\"\"\n    return {\"to\": to, \"body\": body}\n"
+    },
+    {
+      "name": "write_report",
+      "input": {
+        "path": "reports/notify.md",
+        "content": "# Module summary\n\n## notify/channels.py\n- send_email: Queue an email notification.\n- send_sms: Queue an SMS notification.\n\n## notify/retry.py\n- backoff: Seconds to wait before a retry.\n\n## notify/templates.py\n- render: Render a named template with context.\n"
+      },
+      "result": "wrote /home/hatch/workspace/yc-memorable/benchmark/corpus/reports/notify.md"
+    }
+  ],
+  "workflow_id": "summarize-python-module",
+  "prompt": "Summarize the notify module: list each function with a one-line description."
+}

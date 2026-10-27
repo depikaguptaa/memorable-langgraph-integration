@@ -1,0 +1,43 @@
+{
+  "session_id": "bench-explorer-cache",
+  "tool_calls": [
+    {
+      "name": "list_files",
+      "input": {
+        "directory": "cache"
+      },
+      "result": "core.py\nkeys.py"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "cache/core.py"
+      },
+      "result": "\"\"\"Cache core.\"\"\"\n\n_store = {}\n\ndef get(key):\n    \"\"\"Fetch a cached value or None.\"\"\"\n    return _store.get(key)\n\ndef put(key, val, ttl=60):\n    \"\"\"Store a value with a ttl in seconds.\"\"\"\n    _store[key] = val\n"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "cache/keys.py"
+      },
+      "result": "\"\"\"Cache keys.\"\"\"\n\ndef user_key(user_id):\n    \"\"\"Cache key for a user record.\"\"\"\n    return f\"user:{user_id}\"\n"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "cache/core.py"
+      },
+      "result": "\"\"\"Cache core.\"\"\"\n\n_store = {}\n\ndef get(key):\n    \"\"\"Fetch a cached value or None.\"\"\"\n    return _store.get(key)\n\ndef put(key, val, ttl=60):\n    \"\"\"Store a value with a ttl in seconds.\"\"\"\n    _store[key] = val\n"
+    },
+    {
+      "name": "write_report",
+      "input": {
+        "path": "reports/cache.md",
+        "content": "# Module summary\n\n## cache/core.py\n- get: Fetch a cached value or None.\n- put: Store a value with a ttl in seconds.\n\n## cache/keys.py\n- user_key: Cache key for a user record.\n"
+      },
+      "result": "wrote /home/hatch/workspace/yc-memorable/benchmark/corpus/reports/cache.md"
+    }
+  ],
+  "workflow_id": "summarize-python-module",
+  "prompt": "Summarize the cache module: list each function with a one-line description."
+}

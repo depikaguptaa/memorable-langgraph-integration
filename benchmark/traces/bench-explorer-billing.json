@@ -1,0 +1,43 @@
+{
+  "session_id": "bench-explorer-billing",
+  "tool_calls": [
+    {
+      "name": "list_files",
+      "input": {
+        "directory": "billing"
+      },
+      "result": "invoices.py\nplans.py"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "billing/invoices.py"
+      },
+      "result": "\"\"\"Invoices.\"\"\"\n\ndef make_invoice(customer, cents):\n    \"\"\"Build an invoice dict for a customer.\"\"\"\n    return {\"customer\": customer, \"cents\": cents}\n\ndef invoice_total(inv):\n    \"\"\"Total in cents for an invoice.\"\"\"\n    return inv[\"cents\"]\n\ndef mark_paid(inv):\n    \"\"\"Flag an invoice as paid.\"\"\"\n    inv[\"paid\"] = True\n"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "billing/plans.py"
+      },
+      "result": "\"\"\"Billing plans.\"\"\"\n\ndef plan_price(plan):\n    \"\"\"Monthly price in cents for a plan name.\"\"\"\n    return {\"free\": 0, \"pro\": 2000}[plan]\n"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "billing/invoices.py"
+      },
+      "result": "\"\"\"Invoices.\"\"\"\n\ndef make_invoice(customer, cents):\n    \"\"\"Build an invoice dict for a customer.\"\"\"\n    return {\"customer\": customer, \"cents\": cents}\n\ndef invoice_total(inv):\n    \"\"\"Total in cents for an invoice.\"\"\"\n    return inv[\"cents\"]\n\ndef mark_paid(inv):\n    \"\"\"Flag an invoice as paid.\"\"\"\n    inv[\"paid\"] = True\n"
+    },
+    {
+      "name": "write_report",
+      "input": {
+        "path": "reports/billing.md",
+        "content": "# Module summary\n\n## billing/invoices.py\n- make_invoice: Build an invoice dict for a customer.\n- invoice_total: Total in cents for an invoice.\n- mark_paid: Flag an invoice as paid.\n\n## billing/plans.py\n- plan_price: Monthly price in cents for a plan name.\n"
+      },
+      "result": "wrote /home/hatch/workspace/yc-memorable/benchmark/corpus/reports/billing.md"
+    }
+  ],
+  "workflow_id": "summarize-python-module",
+  "prompt": "Summarize the billing module: list each function with a one-line description."
+}

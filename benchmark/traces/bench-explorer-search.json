@@ -1,0 +1,43 @@
+{
+  "session_id": "bench-explorer-search",
+  "tool_calls": [
+    {
+      "name": "list_files",
+      "input": {
+        "directory": "search"
+      },
+      "result": "index.py\nrank.py"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "search/index.py"
+      },
+      "result": "\"\"\"Search index.\"\"\"\n\ndef add_doc(index, doc_id, text):\n    \"\"\"Add a document to the in-memory index.\"\"\"\n    index[doc_id] = text\n\ndef search(index, q):\n    \"\"\"Return doc ids containing the query.\"\"\"\n    return [d for d, t in index.items() if q in t]\n"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "search/rank.py"
+      },
+      "result": "\"\"\"Ranking.\"\"\"\n\ndef rank(hits, scores):\n    \"\"\"Sort hits by score, best first.\"\"\"\n    return sorted(hits, key=lambda h: scores.get(h, 0), reverse=True)\n"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "search/index.py"
+      },
+      "result": "\"\"\"Search index.\"\"\"\n\ndef add_doc(index, doc_id, text):\n    \"\"\"Add a document to the in-memory index.\"\"\"\n    index[doc_id] = text\n\ndef search(index, q):\n    \"\"\"Return doc ids containing the query.\"\"\"\n    return [d for d, t in index.items() if q in t]\n"
+    },
+    {
+      "name": "write_report",
+      "input": {
+        "path": "reports/search.md",
+        "content": "# Module summary\n\n## search/index.py\n- add_doc: Add a document to the in-memory index.\n- search: Return doc ids containing the query.\n\n## search/rank.py\n- rank: Sort hits by score, best first.\n"
+      },
+      "result": "wrote /home/hatch/workspace/yc-memorable/benchmark/corpus/reports/search.md"
+    }
+  ],
+  "workflow_id": "summarize-python-module",
+  "prompt": "Summarize the search module: list each function with a one-line description."
+}

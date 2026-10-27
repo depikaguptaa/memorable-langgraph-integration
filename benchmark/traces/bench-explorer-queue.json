@@ -1,0 +1,50 @@
+{
+  "session_id": "bench-explorer-queue",
+  "tool_calls": [
+    {
+      "name": "list_files",
+      "input": {
+        "directory": "queue"
+      },
+      "result": "core.py\ndlq.py\nworker.py"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "queue/core.py"
+      },
+      "result": "\"\"\"Queue core.\"\"\"\n\ndef push(q, item):\n    \"\"\"Append an item to the queue.\"\"\"\n    q.append(item)\n\ndef pop(q):\n    \"\"\"Remove and return the head item.\"\"\"\n    return q.pop(0)\n"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "queue/dlq.py"
+      },
+      "result": "\"\"\"DLQ.\"\"\"\n\ndef park(dlq, item, reason):\n    \"\"\"Move a failed item to the dead-letter queue.\"\"\"\n    dlq.append((item, reason))\n"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "queue/worker.py"
+      },
+      "result": "\"\"\"Queue workers.\"\"\"\n\ndef work(q, fn):\n    \"\"\"Drain the queue applying fn to each item.\"\"\"\n    while q:\n        fn(pop(q))\n"
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "queue/core.py"
+      },
+      "result": "\"\"\"Queue core.\"\"\"\n\ndef push(q, item):\n    \"\"\"Append an item to the queue.\"\"\"\n    q.append(item)\n\ndef pop(q):\n    \"\"\"Remove and return the head item.\"\"\"\n    return q.pop(0)\n"
+    },
+    {
+      "name": "write_report",
+      "input": {
+        "path": "reports/queue.md",
+        "content": "# Module summary\n\n## queue/core.py\n- push: Append an item to the queue.\n- pop: Remove and return the head item.\n\n## queue/dlq.py\n- park: Move a failed item to the dead-letter queue.\n\n## queue/worker.py\n- work: Drain the queue applying fn to each item.\n"
+      },
+      "result": "wrote /home/hatch/workspace/yc-memorable/benchmark/corpus/reports/queue.md"
+    }
+  ],
+  "workflow_id": "summarize-python-module",
+  "prompt": "Summarize the queue module: list each function with a one-line description."
+}

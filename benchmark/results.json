@@ -1,0 +1,123 @@
+{
+  "task": "summarize-python-module",
+  "modules": [
+    "auth",
+    "billing",
+    "cache",
+    "notify",
+    "queue",
+    "search"
+  ],
+  "baseline_explorer_no_memory": {
+    "runs": [
+      {
+        "module": "auth",
+        "policy": "explorer",
+        "tool_calls": 6,
+        "wall_ms": 22.0,
+        "trace": "/home/hatch/workspace/yc-memorable/benchmark/traces/bench-explorer-auth.json"
+      },
+      {
+        "module": "billing",
+        "policy": "explorer",
+        "tool_calls": 5,
+        "wall_ms": 14.1,
+        "trace": "/home/hatch/workspace/yc-memorable/benchmark/traces/bench-explorer-billing.json"
+      },
+      {
+        "module": "cache",
+        "policy": "explorer",
+        "tool_calls": 5,
+        "wall_ms": 15.9,
+        "trace": "/home/hatch/workspace/yc-memorable/benchmark/traces/bench-explorer-cache.json"
+      },
+      {
+        "module": "notify",
+        "policy": "explorer",
+        "tool_calls": 6,
+        "wall_ms": 14.4,
+        "trace": "/home/hatch/workspace/yc-memorable/benchmark/traces/bench-explorer-notify.json"
+      },
+      {
+        "module": "queue",
+        "policy": "explorer",
+        "tool_calls": 6,
+        "wall_ms": 14.7,
+        "trace": "/home/hatch/workspace/yc-memorable/benchmark/traces/bench-explorer-queue.json"
+      },
+      {
+        "module": "search",
+        "policy": "explorer",
+        "tool_calls": 5,
+        "wall_ms": 13.9,
+        "trace": "/home/hatch/workspace/yc-memorable/benchmark/traces/bench-explorer-search.json"
+      }
+    ],
+    "total_tool_calls": 33,
+    "mean_tool_calls": 5.5,
+    "mean_wall_ms": 15.8
+  },
+  "treatment_procedure_follower": {
+    "runs": [
+      {
+        "module": "auth",
+        "policy": "procedure_follower",
+        "tool_calls": 4,
+        "wall_ms": 14.0,
+        "trace": "/home/hatch/workspace/yc-memorable/benchmark/traces/bench-procedure_follower-auth.json"
+      },
+      {
+        "module": "billing",
+        "policy": "procedure_follower",
+        "tool_calls": 4,
+        "wall_ms": 13.2,
+        "trace": "/home/hatch/workspace/yc-memorable/benchmark/traces/bench-procedure_follower-billing.json"
+      },
+      {
+        "module": "cache",
+        "policy": "procedure_follower",
+        "tool_calls": 4,
+        "wall_ms": 13.3,
+        "trace": "/home/hatch/workspace/yc-memorable/benchmark/traces/bench-procedure_follower-cache.json"
+      },
+      {
+        "module": "notify",
+        "policy": "procedure_follower",
+        "tool_calls": 5,
+        "wall_ms": 14.4,
+        "trace": "/home/hatch/workspace/yc-memorable/benchmark/traces/bench-procedure_follower-notify.json"
+      },
+      {
+        "module": "queue",
+        "policy": "procedure_follower",
+        "tool_calls": 5,
+        "wall_ms": 14.5,
+        "trace": "/home/hatch/workspace/yc-memorable/benchmark/traces/bench-procedure_follower-queue.json"
+      },
+      {
+        "module": "search",
+        "policy": "procedure_follower",
+        "tool_calls": 4,
+        "wall_ms": 13.4,
+        "trace": "/home/hatch/workspace/yc-memorable/benchmark/traces/bench-procedure_follower-search.json"
+      }
+    ],
+    "total_tool_calls": 26,
+    "mean_tool_calls": 4.33,
+    "mean_wall_ms": 13.8
+  },
+  "delta_tool_calls_pct": 21.2,
+  "delta_wall_ms_pct": 12.7,
+  "recall_latency_ms": {
+    "n": 10,
+    "mean_ms": 132.3,
+    "median_ms": 130.3,
+    "min_ms": 127.1,
+    "max_ms": 142.6
+  },
+  "caveats": [
+    "No extraction-API key in this environment; treatment uses a fixture procedure in memorable's show format, not a stored one.",
+    "No LLM key in this environment; planners are scripted stand-ins for LLM explore-vs-follow behavior.",
+    "Live recall was exercised for real (miss path) and its latency timed; the MCP server path was smoke-tested separately."
+  ]
+}
