@@ -13,9 +13,11 @@ trace is plain JSON shaped like::
     }
 
 This tracer records that shape, as Memorable's docs describe it for
-`memorable ingest`. The shape was not validated against a live
-extraction run in this repo, so the hand-off is unproven until an
-ingest succeeds.
+`memorable ingest`. The shape was validated against a live extraction
+run on 2026-10-27: a trace ending in a clean execute step was stored
+as a procedure, and recall, show, and chain all hit it. Execute-step
+results are stored as exit_code objects, because ingest forwards a
+result only in that form; a plain string result is dropped.
 """
 
 from __future__ import annotations

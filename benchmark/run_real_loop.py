@@ -6,6 +6,11 @@ Steps, per module in benchmark/corpus:
      recall_procedure). Ingest that trace too.
   3. Compare tool calls, and record whether each ingest succeeded.
 
+Each run ends with a verify step (the integration tests), so the
+trace ends in a clean execute step and the extraction service can
+admit it. Without that step every trace is refused, as the first
+real run showed.
+
 Provenance is written into the output file: planner type, how many
 procedures were stored before the run, and whether each ingest succeeded.
 With no stored procedures, or with no chat model key and no
@@ -148,14 +153,19 @@ def _planner_from_model(model) -> object:
                 name, kwargs = item[0], dict(item[1])
                 if name not in ("list_files", "read_file", "write_report"):
                     raise ValueError(f"unknown tool {name!r}")
+                if name == "list_files":
+                    if str(kwargs.get("directory", "")) != module_dir:
+                        raise ValueError(f"unexpected directory: {kwargs.get('directory')!r}")
                 if name == "read_file":
                     path = str(kwargs.get("path", ""))
-                    if not path.startswith(module_dir + "/") or ".." in _Path(path).parts:
-                        raise ValueError(f"path outside module: {path!r}")
+                    if path not in files:
+                        # A hallucinated path would crash the run in
+                        # read_file; fall back instead of failing.
+                        raise ValueError(f"unknown file: {path!r}")
                 if name == "write_report":
                     path = str(kwargs.get("path", ""))
-                    if not path.startswith("reports/") or ".." in _Path(path).parts:
-                        raise ValueError(f"path outside reports: {path!r}")
+                    if path != f"reports/{module_dir}.md":
+                        raise ValueError(f"unexpected report path: {path!r}")
                 calls.append((name, kwargs))
             if not any(n == "write_report" for n, _ in calls):
                 calls.append(("write_report", {"path": f"reports/{module_dir}.md", "content": ""}))
@@ -172,6 +182,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--planner-model", default="")
     ap.add_argument("--allow-scripted", action="store_true")
+    ap.add_argument("--verify-command",
+                    default="python -m pytest tests/test_integration.py -q")
+    ap.add_argument("--verify-cwd", default=str(HERE.parent))
     ap.add_argument("--trace-dir", default=str(HERE / "traces"))
     ap.add_argument("--out", default=str(HERE / "real_loop_results.json"))
     args = ap.parse_args()
@@ -227,7 +240,9 @@ def main() -> int:
             t0 = time.perf_counter()
             state = run_agent(task, module_dir=module, root=CORPUS,
                               policy=arm_policy, tracer=tracer,
-                              recall_fn=arm_recall_fn)
+                              recall_fn=arm_recall_fn,
+                              verify_command=args.verify_command,
+                              verify_cwd=args.verify_cwd)
             wall_ms = round((time.perf_counter() - t0) * 1000, 1)
             trace_path = tracer.write_trace()
             ok, msg = tracer.ingest(trace_path)

@@ -5,12 +5,12 @@ Memorable asks for custom harness and framework integrations on its YC page. Thi
 ## What you get
 
 - `memorable_langgraph/recall.py`: `build_recall_node()` returns a LangGraph node. It recalls at task start through Memorable's read-only MCP server (`memorable mcp`, five tools, all read-only), with the `memorable recall` CLI as fallback. The MCP `memorable_recall` tool returns titles and slugs, not steps, so a hit is followed by `memorable_show` for the full procedure before injection, wrapped in a guardrail marker, as reference data, not instructions. `recall_chain()` uses `memorable chain --json` plus `show` for multi-step tasks that one procedure cannot cover. A miss returns an empty string, so the agent just proceeds without memory. Recall failures never raise out of the node by default (silent mode, like Memorable's own hook), so a recall failure can never break a prompt.
-- `memorable_langgraph/tracer.py`: `MemorableTracer`, a LangChain tracer that records every tool call as `{name, input, result}` in the JSON shape Memorable's docs describe for `memorable ingest`. That shape was never accepted by a live extraction run: a logged-in ingest of a plain benchmark trace was refused by the service (no_postcondition), because the trace ended in a write with no clean execute step to prove the run. `benchmark/run_verified_trace.py` adds that step. A verified trace was still refused, because the tracer wrote every result as a string, and ingest forwards a result only when it is an object with a numeric exit_code, so the server never saw the clean exit. Execute-step results are now stored as exit_code objects. Admission is still unproven until a live ingest of the new shape succeeds. `tracer.write_trace()` writes the file. `tracer.ingest(path)` pipes it to `memorable ingest` and fails loudly if the extraction API has no credentials, instead of pretending the procedure was stored.
+- `memorable_langgraph/tracer.py`: `MemorableTracer`, a LangChain tracer that records every tool call as `{name, input, result}` in the JSON shape Memorable's docs describe for `memorable ingest`. The shape was validated on 2026-10-27: a trace ending in a clean execute step was stored as a procedure, and recall, show, and chain all hit it. The key detail: ingest forwards a step's result only when it is an object with a numeric exit_code, so execute-step results are stored as exit_code objects; a plain string result is dropped by ingest and the service refuses the trace. `tracer.write_trace()` writes the file. `tracer.ingest(path)` pipes it to `memorable ingest` and fails loudly if the extraction API has no credentials, instead of pretending the procedure was stored.
 - `memorable_langgraph/agent.py`: a demo LangGraph agent for a repeated task, "summarize a Python module". Graph: `memorable_recall -> execute -> END`. The planner is swappable: a scripted explorer (baseline), a scripted procedure follower (treatment), or any LangChain chat model for a real LLM rerun. It also has a `run_command` tool (no shell, result always starts with the exit code) and an optional verify step: `run_agent(..., verify_command="...")` runs the command as the last tool call, so the trace ends with proof the run worked.
 
 ## Measured results
 
-Repeated task, 6 modules in `benchmark/corpus`: summarize the module, list each function with a one-line description, write the report.
+Deterministic fixture numbers: scripted planners, fixture procedure, no LLM key. Repeated task, 6 modules in `benchmark/corpus`: summarize the module, list each function with a one-line description, write the report.
 
 | | Tool calls |
 |---|---|
@@ -20,7 +20,9 @@ Repeated task, 6 modules in `benchmark/corpus`: summarize the module, list each 
 
 Recall latency, measured for real: 10 timed `memorable recall` calls against the empty local store, mean about 130 ms. That includes the CLI process spawn. Memorable's docs claim about 60 ms in-process prompt overhead; this number is not that, it is the CLI path.
 
-Tests: 27/27 passing (`pytest tests/`), including recall-then-show, chain, MCP miss wording, silent-failure, verify-step, and exit_code-object tests. Full numbers and per-module traces are in `benchmark/results.json` and `benchmark/traces/`.
+The first real run with a chat-model planner happened 2026-10-27 (see Honest limits). Its totals are not in this repo; they live in the run's results file on the logged-in machine.
+
+Tests: 34/34 passing (`pytest tests/`), including recall-then-show, chain, MCP miss wording, silent-failure, verify-step, exit_code-object, slug-format and full-slug recall, planner-validation, and real-loop verify-wiring tests. Full numbers and per-module traces are in `benchmark/results.json` and `benchmark/traces/`.
 
 ## Try it
 
@@ -51,8 +53,8 @@ ok, msg = tracer.ingest(path)  # needs `memorable login` first
 
 Read these before trusting the numbers above.
 
-1. No real procedure was stored in this run. `memorable ingest` needs `memorable login`, and no login was available here. The treatment arm uses a fixture procedure in Memorable's `show` render format, standing in for what the extraction API would return. Only the miss path was ever exercised, on an empty store, through both MCP and CLI. The hit path, recall then show, was never exercised against a real stored procedure, and the tracer JSON was never accepted by a live extraction run. The store was empty. The first version of this code also had a real bug on that path: it injected MCP recall text directly, and it read the MCP miss text ("No stored procedure matches that task.") as a hit, because it only checked for the words "no matching". The recall code now does recall then show, checks the miss wordings, and is covered by a regression test for the MCP miss text.
-2. No LLM key was available, so the planners are scripted stand-ins for an LLM planner's explore vs follow behavior. `run_real_loop.py` wraps a LangChain chat model as the planner, so the benchmark reruns with real numbers once a key exists. Both arms use the same planner; only the recalled procedure differs. Wall time is not claimed: with scripted planners it is mostly noise. Tool calls are the measured effect.
+1. A real procedure is now stored, and the hit path has been exercised against it on a logged-in machine: recall scored 0.728, chain matched with coverage 1, and `show` renders the verify command and the execute step. The caveat is that the rendered procedure shows only the execute step; the read and write steps from the trace do not appear, and chain reads/writes are empty. What recall returns today is the verified command, not the full read/write plan.
+2. The first real run happened 2026-10-27 with a LangChain planner (openai:gpt-4o-mini, zero fallbacks to the scripted explorer). Its ingests were all refused because the traces ended in a write with no execute step; this version ends every run with a verify step so the traces can be admitted. Both arms use the same planner; only the recalled procedure differs. Wall time is not claimed: it is mostly model latency. Tool calls are the measured effect.
 3. The demo task is deliberately narrow: one repeated task, six small modules. It shows the integration works and that injecting a procedure removes exploration calls. It is not a general claim about Memorable on arbitrary tasks.
 
 ## The real loop
@@ -66,6 +68,6 @@ python benchmark/run_real_loop.py --planner-model openai:gpt-4o-mini
 python benchmark/run_real_loop.py --allow-scripted
 ```
 
-On a Mac with Codex, `record` does not work: it needs gbrain session capture, and Codex has none, so it reports no session receipt. The path that can work is the verified trace: run `benchmark/run_verified_trace.py`, ingest the trace it writes, then check `npx memorable-cli list`. Until a live ingest succeeds, the store is still empty and the hit path is still unproven.
+On a Mac with Codex, `record` does not work: it needs gbrain session capture, and Codex has none, so it reports no session receipt. The path that works is the verified trace: run `benchmark/run_verified_trace.py`, ingest the trace it writes, then check `memorable list`. That path stored the first procedure on 2026-10-27, and recall, show, and chain all hit it. `benchmark/run_real_loop.py` now ends every trace with the same verify step.
 
 Built by Depika Gupta, AI and backend engineer. I build LangChain multi-agent systems, RAG, and LLM observability at a remote US startup. github.com/depikaguptaa

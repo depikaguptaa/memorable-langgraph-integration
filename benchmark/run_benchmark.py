@@ -9,22 +9,27 @@ planner fed by a recalled procedure.
 
 Honest limits of this run
 -------------------------
-1. No extraction-API login is available in this environment (`memorable
-   login` needs a human and browser approval), so `memorable ingest`
-   cannot store a real procedure. The treatment arm therefore uses a
-   fixture procedure in Memorable's `show` render format, standing in for
-   what the extraction API would return. The recall *path* (MCP server /
-   CLI) is real; the store is empty, so live recall returns a miss.
+1. The treatment arm uses a fixture procedure in Memorable's `show`
+   render format, standing in for a stored one, so this run is
+   deterministic and repeatable. A real procedure has since been
+   stored and the hit path verified; the real numbers come from
+   `benchmark/run_real_loop.py`, which runs both arms with a chat
+   model planner against the live store.
 2. No LLM API key is available either, so the planners are scripted policies
    standing in for an LLM planner's explore-vs-follow behavior. For a real
    LLM rerun, `benchmark/run_real_loop.py` wraps a LangChain chat model as
    the planner; this script has no `--planner-model` flag.
 3. Recall overhead is measured for real: timed `memorable recall` calls
-   against the empty local store (CLI spawn + local matchers).
+   against the local store (CLI spawn + local matchers). In this
+   environment the store is empty, so the timed path is the miss path.
+   The latency number is the CLI path, not Memorable's in-process
+   prompt overhead.
 
 What IS verified here: the integration code paths (tracer schema, recall
 node injection, MCP/CLI fallback), the mechanical effect of injecting a
 procedure (exploration calls eliminated), and the real recall latency.
+The tracer shape itself was validated separately: a verified trace was
+stored by a live extraction run on 2026-10-27.
 """
 
 from __future__ import annotations
@@ -166,12 +171,14 @@ def main() -> None:
         ),
         "recall_latency_ms": measure_recall_latency(),
         "caveats": [
-            "No extraction-API login in this environment; treatment uses a "
-            "fixture procedure in memorable's show format, not a stored one.",
+            "Treatment uses a fixture procedure in memorable's show "
+            "format, not a stored one; this run is deterministic. "
+            "Real numbers come from benchmark/run_real_loop.py.",
             "No LLM key in this environment; planners are scripted stand-ins "
             "for LLM explore-vs-follow behavior.",
-            "Live recall was exercised for real (miss path) and its latency "
-            "timed; the MCP server path was smoke-tested separately.",
+            "Live recall was exercised for real (miss path on the empty "
+            "store) and its latency timed; the MCP server path was "
+            "smoke-tested separately.",
         ],
     }
     Path(args.out).write_text(json.dumps(results, indent=2))

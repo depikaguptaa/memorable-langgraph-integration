@@ -16,7 +16,8 @@ Usage (from the repo root, in the venv):
 
 The ingest step needs a logged-in CLI on the machine that runs it;
 this script only writes the trace, it never calls the CLI itself.
-Admission is still unproven until a live ingest succeeds: the
+The shape was validated on 2026-10-27: a trace from this script was
+stored as a procedure, and recall, show, and chain all hit it. The
 script prints the last step so the caller can check it before
 ingesting.
 """
@@ -49,6 +50,8 @@ def main() -> None:
     )
     ap.add_argument("--verify-cwd", default=str(REPO_ROOT))
     args = ap.parse_args()
+    if not (CORPUS / args.module).is_dir():
+        ap.error(f"no such module in benchmark/corpus: {args.module}")
 
     trace_dir = Path(args.trace_dir)
     trace_dir.mkdir(parents=True, exist_ok=True)

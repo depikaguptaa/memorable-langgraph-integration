@@ -68,6 +68,11 @@ def test_ingest_reports_login_block(tmp_path):
     ok, msg = tracer.ingest(path)
     if ok:
         pytest.skip("memorable login is configured here; login-block path not exercised")
+    if "login" not in msg.lower():
+        # Login is configured here and ingest failed for another reason
+        # (for example the empty trace itself was refused); the
+        # login-block path is not what is being exercised.
+        pytest.skip("ingest failed for a non-login reason; login-block path not exercised")
     # In this environment there are no extraction-API credentials, so ingest
     # must fail loudly, never silently.
     assert ok is False
@@ -161,6 +166,35 @@ def test_planner_accepts_fenced_json_and_rejects_escape(tmp_path):
     calls2 = planner2("Summarize the auth module.", "auth", "", CORPUS)
     assert planner2.fallbacks["count"] == 1
     assert all(c[0] != "read_file" or not c[1]["path"].startswith("..") for c in calls2)
+
+
+def test_planner_rejects_hallucinated_paths(tmp_path):
+    from benchmark.run_real_loop import _planner_from_model
+
+    class FakeReply:
+        def __init__(self, content):
+            self.content = content
+
+    class FakeModel:
+        def __init__(self, content):
+            self.content = content
+
+        def invoke(self, prompt):
+            return FakeReply(self.content)
+
+    cases = [
+        '[["read_file", {"path": "auth/nope.py"}], ["write_report", {"path": "reports/auth.md", "content": ""}]]',
+        '[["list_files", {"directory": "auth"}], ["write_report", {"path": "reports/other.md", "content": ""}]]',
+        '[["list_files", {"directory": "billing"}], ["write_report", {"path": "reports/auth.md", "content": ""}]]',
+    ]
+    for content in cases:
+        planner = _planner_from_model(FakeModel(content))
+        calls = planner("Summarize the auth module.", "auth", "", CORPUS)
+        assert planner.fallbacks["count"] == 1
+        paths = [c[1].get("path") for c in calls]
+        assert "auth/nope.py" not in paths
+        assert "reports/other.md" not in paths
+        assert "reports/auth.md" in paths
 
 
 def test_explorer_uses_more_calls_than_follower(tmp_path):

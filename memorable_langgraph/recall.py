@@ -62,13 +62,32 @@ def _is_miss(text: str) -> bool:
 
 
 _SLUG_RE = re.compile(r"\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b")
+_FULL_SLUG_RE = re.compile(r"procedures/[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
 def _extract_slugs(text: str) -> list[str]:
+    """Slugs in recall output, full `procedures/...` slugs first.
+
+    Real recall output carries slugs like
+    `procedures/92ef4af3-add-auth-module-structure-to-documentation`
+    (a score, the slug, tags on a CLI line, or slug then title on MCP
+    lines). The bare hyphenated pattern alone matches only the tail
+    after the hash, which `show` rejects, so the full slug must be
+    tried first and the bare pattern is only a fallback.
+    """
     seen: list[str] = []
-    for slug in _SLUG_RE.findall(text):
-        if slug not in seen:
+    for slug in _FULL_SLUG_RE.findall(text):
+        slug = slug.rstrip(".,;")
+        if slug and slug not in seen:
             seen.append(slug)
+    for slug in _SLUG_RE.findall(text):
+        if slug in seen:
+            continue
+        # A bare match that is only the tail of a full slug already seen
+        # is the same procedure, not a second one.
+        if any(s.endswith("-" + slug) for s in seen):
+            continue
+        seen.append(slug)
     return seen[:5]
 
 
