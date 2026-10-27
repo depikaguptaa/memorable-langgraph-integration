@@ -6,7 +6,7 @@ agent's context, and capture the agent's tool calls as a trace in the exact
 JSON shape `memorable ingest` expects.
 """
 
-from .recall import RecallResult, build_recall_node, recall_procedure
+from .recall import RecallResult, build_recall_node, recall_chain, recall_procedure
 from .tracer import MemorableTracer
 
-__all__ = ["MemorableTracer", "RecallResult", "build_recall_node", "recall_procedure"]
+__all__ = ["MemorableTracer", "RecallResult", "build_recall_node", "recall_chain", "recall_procedure"]
