@@ -1,5 +1,8 @@
 # Module summary
 
+## auth/__init__.py
+- auth/__init__.py: (no functions)
+
 ## auth/passwords.py
 - hash_password: Hash a password with bcrypt.
 - check_password: Compare a password against its hash.

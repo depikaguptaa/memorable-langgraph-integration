@@ -22,6 +22,8 @@ MemorableTracer sees every call. The planner is swappable:
 from __future__ import annotations
 
 import ast
+import shlex
+import subprocess
 from pathlib import Path
 from typing import Any, Callable
 
@@ -37,6 +39,7 @@ class AgentState(TypedDict, total=False):
     memorable_procedure: str
     report_path: str
     functions_found: int
+    verify_result: str
 
 
 def make_tools(root: str | Path):
@@ -67,7 +70,44 @@ def make_tools(root: str | Path):
         target.write_text(content)
         return f"wrote {target}"
 
-    return {"list_files": list_files, "read_file": read_file, "write_report": write_report}
+    @tool
+    def run_command(command: str, cwd: str = "") -> str:
+        """Run a command without a shell and report its exit code.
+
+        Local verify commands only. No shell is used, so pipes and
+        redirects are literal arguments, never interpreted. The result
+        always starts with the exit code, so a trace reader can tell a
+        clean run from a failed one without parsing output text.
+        """
+        try:
+            args = shlex.split(command)
+        except ValueError as exc:
+            return f"exit_code: 2\ncould not parse command: {exc}"
+        if not args:
+            return "exit_code: 2\nempty command"
+        try:
+            proc = subprocess.run(
+                args,
+                cwd=cwd or None,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        except FileNotFoundError as exc:
+            return f"exit_code: 127\ncommand not found: {exc}"
+        except subprocess.TimeoutExpired:
+            return "exit_code: 124\ncommand timed out after 120s"
+        out = (proc.stdout + proc.stderr).strip()
+        if out:
+            return f"exit_code: {proc.returncode}\n{out}"
+        return f"exit_code: {proc.returncode}"
+
+    return {
+        "list_files": list_files,
+        "read_file": read_file,
+        "write_report": write_report,
+        "run_command": run_command,
+    }
 
 
 def _module_files(root: str | Path, module_dir: str, skip_init: bool) -> list[str]:
@@ -129,8 +169,16 @@ def run_agent(
     tracer: Any = None,  # noqa: ANN401
     recall_fn: Callable[[str], RecallResult] | None = None,
     procedure_text: str = "",
+    verify_command: str | None = None,
+    verify_cwd: str | None = None,
 ) -> dict[str, Any]:
-    """Run the summarize-module agent once. Returns the final graph state."""
+    """Run the summarize-module agent once. Returns the final graph state.
+
+    When verify_command is given, it runs as the last tool call, after
+    the report is written, so the trace ends with a clean execute step
+    that proves the run worked. Memorable refuses traces that end
+    without such a step, so a plain summarize run can never be stored.
+    """
     tools = make_tools(root)
     callbacks = {"callbacks": [tracer]} if tracer is not None else {}
     recall_node = build_recall_node(recall_fn=recall_fn)
@@ -162,7 +210,19 @@ def run_agent(
         tools["write_report"].invoke(
             {"path": report_rel, "content": "\n".join(lines)}, config=callbacks
         )
-        return {"report_path": report_rel, "functions_found": len(read_results)}
+        state: dict[str, Any] = {
+            "report_path": report_rel,
+            "functions_found": len(read_results),
+        }
+        if verify_command is not None:
+            # Last tool call on purpose: Memorable only stores a trace
+            # that ends with a clean execute-class command, so the
+            # verify command is what proves this run worked.
+            state["verify_result"] = tools["run_command"].invoke(
+                {"command": verify_command, "cwd": verify_cwd or ""},
+                config=callbacks,
+            )
+        return state
 
     graph = StateGraph(AgentState)
     graph.add_node("memorable_recall", recall_node)
