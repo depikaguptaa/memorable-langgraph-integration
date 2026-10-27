@@ -1,70 +1,60 @@
-# yc-memorable  - LangGraph integration for Memorable (YC S27)
+# LangGraph integration for Memorable
 
-Custom harness integration for Memorable's procedural memory, built as the
-proof-of-work for the YC bypass play. Memorable's YC page explicitly asks for
-"custom harness and framework integrations", so this is that.
+Memorable asks for custom harness and framework integrations on its YC page. This is one, built and measured: a LangGraph node that recalls a stored procedure at task start, and a tracer that captures an agent's tool calls as ingest-ready JSON.
 
-## What it is
+## What you get
 
-`memorable_langgraph/`  - a small Python package:
+- `memorable_langgraph/recall.py`: `build_recall_node()` returns a LangGraph node. It recalls at task start through Memorable's read-only MCP server (`memorable mcp`, five tools, all read-only), with the `memorable recall` CLI as fallback. A hit is injected into agent context wrapped in a guardrail marker, as reference data, not instructions. A miss returns an empty string, so the agent just proceeds without memory.
+- `memorable_langgraph/tracer.py`: `MemorableTracer`, a LangChain tracer that records every tool call as `{name, input, result}` in the exact JSON shape `memorable ingest` validates. `tracer.write_trace()` writes the file. `tracer.ingest(path)` pipes it to `memorable ingest` and fails loudly if the extraction API has no credentials, instead of pretending the procedure was stored.
+- `memorable_langgraph/agent.py`: a demo LangGraph agent for a repeated task, "summarize a Python module". Graph: `memorable_recall -> execute -> END`. The planner is swappable: a scripted explorer (baseline), a scripted procedure follower (treatment), or any LangChain chat model for a real LLM rerun.
 
-- `recall.py`  - recall a stored procedure at task start. Primary path is
-  Memorable's read-only MCP server (`memorable mcp` over stdio, five tools,
-  all readOnlyHint); falls back to the `memorable recall` CLI. The recalled
-  procedure is injected into agent context wrapped in a guardrail marker, as
-  reference data, mirroring Memorable's own `show` rendering.
-  `build_recall_node()` returns a LangGraph node implementing the
-  recall-at-start flow.
-- `tracer.py`  - `MemorableTracer`, a LangChain `BaseTracer` that captures
-  tool calls into the exact JSON shape `memorable ingest` validates
-  (`{session_id, workflow_id?, prompt?, tool_calls: [{name, input, result?}]}`),
-  writes trace files, and can pipe them to `memorable ingest` (surfacing the
-  login block honestly instead of pretending the store worked).
-- `agent.py`  - demo LangGraph agent for a repeated task (summarize a Python
-  module), wired as `memorable_recall -> execute -> END`, with a swappable
-  planner: `explorer` (no-memory baseline), `procedure_follower` (treatment),
-  or any LangChain chat model for a real LLM rerun.
+## Measured results
 
-`benchmark/`  - before/after harness over 6 sample modules plus a real
-recall-latency measurement. `tests/`  - 8 pytest tests, all passing.
+Repeated task, 6 modules in `benchmark/corpus`: summarize the module, list each function with a one-line description, write the report.
 
-## Verified results (run 2026-10-23)
+| | Tool calls |
+|---|---|
+| Baseline, no memory (explorer) | 33 |
+| With recalled procedure (follower) | 26 |
+| Difference | 21.2% fewer |
 
-- Tests: 8/8 pass (`pytest tests/`).
-- Benchmark: baseline 33 tool calls vs treatment 26 across 6 repeated tasks =
-  **21.2% fewer tool calls** with the recalled procedure; 12.7% lower wall
-  time on scripted planners.
-- Recall latency, measured for real: `memorable recall` miss path, n=10,
-  mean 132ms (their docs claim ~60ms in-process prompt overhead; mine includes
-  CLI process spawn).
-- `memorable doctor`: install verified; MCP server lists all five read-only
-  tools and `memorable_recall` answers correctly on an empty store.
-- Tracer output passes `memorable ingest` schema validation (malformed input
-  is rejected with the schema error; ours proceeds to the credential check).
+Recall latency, measured for real: 10 timed `memorable recall` calls against the empty local store, mean about 130 ms. That includes the CLI process spawn. Memorable's docs claim about 60 ms in-process prompt overhead; this number is not that, it is the CLI path.
 
-## Honest gaps (stated in the outreach too)
+Tests: 8/8 passing (`pytest tests/`). Full numbers and per-module traces are in `benchmark/results.json` and `benchmark/traces/`.
 
-1. `memorable ingest` needs `memorable login` with a dashboard key from
-   memorable.sh/dash. No key in this environment, so no real procedure was
-   ever stored; the treatment arm used a fixture procedure in Memorable's
-   `show` render format. Getting the key is a 2-minute human step, then the
-   full loop (ingest -> recall -> inject) runs for real.
-2. No LLM API key in this environment, so the planners are scripted stand-ins
-   for LLM explore-vs-follow behavior. The agent accepts any LangChain chat
-   model, so the benchmark reruns with real numbers once a key exists.
+## Try it
 
-## What Depika needs to do
+```bash
+pip install -r requirements.txt
+curl -fsSL https://memorable.sh/install.sh | sh   # memorable CLI, see install.sh
+python -m pytest tests/
+python benchmark/run_benchmark.py
+```
 
-1. Grab a key at memorable.sh/dash (Environments, then Connect, or Account,
-   then New key for an agent) and run `echo '<key>' | memorable login --paste`.
-2. Create the GitHub repo herself and share the URL (private or public, her call).
-3. No video: she decided 2026-10-27 to record no more videos. Offer a live walkthrough instead. LOOM_SCRIPT.md is superseded.
-4. Send the email (drafts in OUTREACH.md).
+## Use it in your own agent
 
-## Layout
+```python
+from memorable_langgraph import MemorableTracer, build_recall_node
 
-- `memorable_langgraph/`  - the integration package
-- `benchmark/`  - corpus, `run_benchmark.py`, traces, `results.json`
-- `tests/`  - pytest suite
-- `OUTREACH.md`, `LOOM_SCRIPT.md`  - local only, never pushed
-- `.venv/`  - local virtualenv (langgraph, langchain-core, pytest)
+graph.add_node("memorable_recall", build_recall_node())
+graph.set_entry_point("memorable_recall")
+
+tracer = MemorableTracer("traces", session_id="run-001")
+# run your graph with callbacks=[tracer]
+path = tracer.write_trace()
+ok, msg = tracer.ingest(path)  # needs `memorable login` first
+```
+
+## Honest limits
+
+Read these before trusting the numbers above.
+
+1. No real procedure was stored in this run. `memorable ingest` needs `memorable login` with a dashboard key, and no key was available here. The treatment arm uses a fixture procedure in Memorable's `show` render format, standing in for what the extraction API would return. The recall path is real (MCP server and CLI were exercised, including the miss path on an empty store). The store was empty.
+2. No LLM key was available, so the planners are scripted stand-ins for an LLM planner's explore vs follow behavior. The agent accepts any LangChain chat model, so the benchmark reruns with real numbers once a key exists. Wall time is not claimed: with scripted planners it is mostly noise. Tool calls are the measured effect.
+3. The demo task is deliberately narrow: one repeated task, six small modules. It shows the integration works and that injecting a procedure removes exploration calls. It is not a general claim about Memorable on arbitrary tasks.
+
+## What is next
+
+The useful next step is the real loop, not more fixtures: log in, ingest a real trace, recall it on a repeat task, and rerun the benchmark with a real LLM planner. That needs a dashboard key and a chat model key, both 2-minute human steps. I am happy to run it end to end on a real workflow as a trial, or walk through the code live.
+
+Built by Depika Gupta, AI and backend engineer. I build LangChain multi-agent systems, RAG, and LLM observability at a remote US startup. github.com/depikaguptaa
