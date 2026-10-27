@@ -77,7 +77,7 @@ def main() -> None:
         "functions_found": state.get("functions_found"),
         "last_step": last["name"] if last else None,
         "last_result_head": (
-            last["result"][:120] if last else None
+            str(last["result"])[:120] if last else None
         ),
         "verify_result_head": (
             str(state.get("verify_result", ""))[:120]

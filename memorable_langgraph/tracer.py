@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -43,6 +44,23 @@ def _parse_tool_input(input_str: str) -> dict[str, Any]:
         except (ValueError, SyntaxError):
             return {"_raw": input_str}
     return parsed if isinstance(parsed, dict) else {"_raw": input_str}
+
+
+def _parse_run_command_result(result: str) -> dict[str, Any] | None:
+    """Split a run_command result into exit code plus output text.
+
+    `memorable ingest` forwards a step's result only when it is an
+    object carrying a numeric exit_code; a plain string result is
+    dropped on the way to the extraction API, so the server never
+    sees that the command exited cleanly and refuses the trace.
+    Keeping the code in the stored shape is what lets the judge
+    admit it. Returns None when the result has no exit code line.
+    """
+    head, _, rest = result.partition("\n")
+    match = re.match(r"exit_code:\s*(-?\d+)\s*$", head.strip())
+    if not match:
+        return None
+    return {"exit_code": int(match.group(1)), "text": rest[:4000]}
 
 
 class MemorableTracer(BaseTracer):
@@ -91,11 +109,15 @@ class MemorableTracer(BaseTracer):
         if pending is None:
             return
         result = output if isinstance(output, str) else json.dumps(output, default=str)
+        if pending["name"] == "run_command" and isinstance(result, str):
+            parsed = _parse_run_command_result(result)
+            if parsed is not None:
+                result = parsed
         self.tool_calls.append(
             {
                 "name": pending["name"],
                 "input": pending["input"],
-                "result": result[:4000],
+                "result": result[:4000] if isinstance(result, str) else result,
             }
         )
 
