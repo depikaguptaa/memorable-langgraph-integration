@@ -26,6 +26,23 @@ def test_run_command_reports_clean_exit(tmp_path):
     assert "42" in result
 
 
+def test_run_command_handles_executable_path_with_space(tmp_path):
+    # Regression: a venv under a folder like "side quest" puts a space
+    # in sys.executable, and plain shlex.split broke it into a path
+    # that does not exist, reporting 127 on every verify run.
+    spaced = tmp_path / "dir with space"
+    spaced.mkdir()
+    script = spaced / "hello.sh"
+    script.write_text('#!/bin/sh\necho "got $1"\n')
+    script.chmod(0o755)
+    tools = make_tools(tmp_path)
+    result = tools["run_command"].invoke(
+        {"command": f"{script} world", "cwd": str(tmp_path)}
+    )
+    assert result.startswith("exit_code: 0")
+    assert "got world" in result
+
+
 def test_run_command_reports_failed_exit_honestly(tmp_path):
     tools = make_tools(tmp_path)
     result = tools["run_command"].invoke(

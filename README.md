@@ -22,7 +22,7 @@ Recall latency, measured for real: 10 timed `memorable recall` calls against the
 
 The first real run with a chat-model planner happened 2026-10-27 (see Honest limits). Its totals are not in this repo; they live in the run's results file on the logged-in machine.
 
-Tests: 34/34 passing (`pytest tests/`), including recall-then-show, chain, MCP miss wording, silent-failure, verify-step, exit_code-object, slug-format and full-slug recall, planner-validation, and real-loop verify-wiring tests. Full numbers and per-module traces are in `benchmark/results.json` and `benchmark/traces/`.
+Tests: 35/35 passing (`pytest tests/`), including recall-then-show, chain, MCP miss wording, silent-failure, verify-step, exit_code-object, slug-format and full-slug recall, planner-validation, spaced executable paths, and real-loop verify-wiring tests. Full numbers and per-module traces are in `benchmark/results.json` and `benchmark/traces/`.
 
 ## Try it
 

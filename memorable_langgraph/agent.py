@@ -22,7 +22,9 @@ MemorableTracer sees every call. The planner is swappable:
 from __future__ import annotations
 
 import ast
+import os
 import shlex
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Callable
@@ -40,6 +42,29 @@ class AgentState(TypedDict, total=False):
     report_path: str
     functions_found: int
     verify_result: str
+
+
+def _split_command(command: str) -> list[str]:
+    """Split a command string without a shell.
+
+    `shlex.split` breaks an executable path that contains a space, for
+    example a venv under a folder named "side quest": the first token
+    becomes a path that does not exist and the run reports 127. When
+    the first token resolves to neither a file nor a PATH lookup, glue
+    leading tokens back together while the joined path names a real
+    file. Quoted paths never reach this step: shlex already keeps them
+    as one token, which resolves on the first check.
+    """
+    parts = shlex.split(command)
+    if not parts:
+        return parts
+    if os.path.isfile(parts[0]) or shutil.which(parts[0]) is not None:
+        return parts
+    for end in range(2, len(parts) + 1):
+        candidate = " ".join(parts[:end])
+        if os.path.isfile(candidate):
+            return [candidate] + parts[end:]
+    return parts
 
 
 def make_tools(root: str | Path):
@@ -80,7 +105,7 @@ def make_tools(root: str | Path):
         clean run from a failed one without parsing output text.
         """
         try:
-            args = shlex.split(command)
+            args = _split_command(command)
         except ValueError as exc:
             return f"exit_code: 2\ncould not parse command: {exc}"
         if not args:
