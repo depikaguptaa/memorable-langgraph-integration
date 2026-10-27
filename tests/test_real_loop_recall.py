@@ -50,6 +50,24 @@ def _stub_mcp(monkeypatch, recall_text, show_text):
     return calls
 
 
+def test_miss_check_ignores_phrase_inside_procedure_text():
+    # A procedure that mentions 404 handling is not a miss.
+    assert not _is_miss("Steps: handle 404 not found errors by retrying.")
+    assert _is_miss("No stored procedure matches that task.")
+    assert _is_miss("no matching procedures.")
+    assert _is_miss("")
+
+
+def test_node_handles_none_result_and_missing_show_text(monkeypatch):
+    # A recall function returning None must not crash the node, even
+    # with silent=False, and format_for_injection(None) is empty.
+    from memorable_langgraph.recall import format_for_injection
+
+    assert format_for_injection(None) == ""
+    node = build_recall_node(recall_fn=lambda t: None, silent=False)
+    assert node({"task": "summarize the auth module"}) == {"memorable_procedure": ""}
+
+
 def test_mcp_miss_text_is_a_miss_not_a_hit(monkeypatch):
     # Regression: the first version read this text as a hit, because it
     # only checked for "no matching".

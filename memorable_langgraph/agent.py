@@ -14,8 +14,9 @@ MemorableTracer sees every call. The planner is swappable:
   writes the report. This is the baseline.
 - "procedure_follower": follows an injected procedure's file list and order
   exactly, no re-reads. This is the treatment arm.
-- a LangChain chat model instance: real LLM planner (needs an API key;
-  not exercised in this environment).
+- a planner callable, for example the wrapper `benchmark/run_real_loop.py`
+  builds around a LangChain chat model (needs an API key; not exercised
+  in this environment).
 """
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ def make_tools(root: str | Path):
 
     def _safe(rel: str) -> Path:
         p = (root / rel).resolve()
-        if not str(p).startswith(str(root)):
+        if not p.is_relative_to(root):
             raise ValueError("path escapes module dir")
         return p
 

@@ -12,8 +12,10 @@ trace is plain JSON shaped like::
         ],
     }
 
-This tracer records exactly that shape so the file it writes can be handed
-straight to `memorable ingest`.
+This tracer records that shape, as Memorable's docs describe it for
+`memorable ingest`. The shape was not validated against a live
+extraction run in this repo, so the hand-off is unproven until an
+ingest succeeds.
 """
 
 from __future__ import annotations
@@ -97,6 +99,29 @@ class MemorableTracer(BaseTracer):
             }
         )
 
+    def on_tool_error(
+        self,
+        error: BaseException,
+        *,
+        run_id: UUID,
+        parent_run_id: UUID | None = None,
+        **kwargs: Any,
+    ) -> None:
+        # Without this hook a failed tool call vanishes from the trace:
+        # on_tool_start recorded it, on_tool_end never fires, and the
+        # pending entry leaks. Record the failure instead, so the trace
+        # shows the procedure as it actually ran.
+        pending = self._pending.pop(str(run_id), None)
+        if pending is None:
+            return
+        self.tool_calls.append(
+            {
+                "name": pending["name"],
+                "input": pending["input"],
+                "result": f"error: {str(error)[:4000]}",
+            }
+        )
+
     # -- trace file --------------------------------------------------------
     def to_trace_dict(self) -> dict[str, Any]:
         trace: dict[str, Any] = {
@@ -138,6 +163,6 @@ class MemorableTracer(BaseTracer):
             return (
                 False,
                 "blocked: extraction API needs credentials; "
-                "run `memorable login` with a key from memorable.sh/dash",
+                "run `memorable login` (browser approval)",
             )
         return False, out or f"ingest failed (exit {proc.returncode})"

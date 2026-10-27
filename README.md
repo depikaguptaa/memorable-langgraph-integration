@@ -20,13 +20,13 @@ Repeated task, 6 modules in `benchmark/corpus`: summarize the module, list each 
 
 Recall latency, measured for real: 10 timed `memorable recall` calls against the empty local store, mean about 130 ms. That includes the CLI process spawn. Memorable's docs claim about 60 ms in-process prompt overhead; this number is not that, it is the CLI path.
 
-Tests: 15/15 passing (`pytest tests/`), including recall-then-show, chain, MCP miss wording, and silent-failure tests. Full numbers and per-module traces are in `benchmark/results.json` and `benchmark/traces/`.
+Tests: 19/19 passing (`pytest tests/`), including recall-then-show, chain, MCP miss wording, and silent-failure tests. Full numbers and per-module traces are in `benchmark/results.json` and `benchmark/traces/`.
 
 ## Try it
 
 ```bash
 pip install -r requirements.txt
-curl -fsSL https://memorable.sh/install.sh | sh   # memorable CLI, see install.sh
+curl -fsSL https://memorable.sh/install.sh | sh   # Memorable's own CLI installer, from memorable.sh
 python -m pytest tests/
 python benchmark/run_benchmark.py
 ```
@@ -49,8 +49,8 @@ ok, msg = tracer.ingest(path)  # needs `memorable login` first
 
 Read these before trusting the numbers above.
 
-1. No real procedure was stored in this run. `memorable ingest` needs `memorable login` with a dashboard key, and no key was available here. The treatment arm uses a fixture procedure in Memorable's `show` render format, standing in for what the extraction API would return. Only the miss path was ever exercised, on an empty store, through both MCP and CLI. The hit path, recall then show, was never exercised against a real stored procedure, and the tracer JSON was never accepted by a live extraction run. The store was empty. The first version of this code also had a real bug on that path: it injected MCP recall text directly, and it read the MCP miss text ("No stored procedure matches that task.") as a hit, because it only checked for the words "no matching". The recall code now does recall then show, checks all three miss wordings, and is covered by a regression test for the MCP miss text.
-2. No LLM key was available, so the planners are scripted stand-ins for an LLM planner's explore vs follow behavior. The agent accepts any LangChain chat model, so the benchmark reruns with real numbers once a key exists. Wall time is not claimed: with scripted planners it is mostly noise. Tool calls are the measured effect.
+1. No real procedure was stored in this run. `memorable ingest` needs `memorable login`, and no login was available here. The treatment arm uses a fixture procedure in Memorable's `show` render format, standing in for what the extraction API would return. Only the miss path was ever exercised, on an empty store, through both MCP and CLI. The hit path, recall then show, was never exercised against a real stored procedure, and the tracer JSON was never accepted by a live extraction run. The store was empty. The first version of this code also had a real bug on that path: it injected MCP recall text directly, and it read the MCP miss text ("No stored procedure matches that task.") as a hit, because it only checked for the words "no matching". The recall code now does recall then show, checks the miss wordings, and is covered by a regression test for the MCP miss text.
+2. No LLM key was available, so the planners are scripted stand-ins for an LLM planner's explore vs follow behavior. `run_real_loop.py` wraps a LangChain chat model as the planner, so the benchmark reruns with real numbers once a key exists. Both arms use the same planner; only the recalled procedure differs. Wall time is not claimed: with scripted planners it is mostly noise. Tool calls are the measured effect.
 3. The demo task is deliberately narrow: one repeated task, six small modules. It shows the integration works and that injecting a procedure removes exploration calls. It is not a general claim about Memorable on arbitrary tasks.
 
 ## The real loop

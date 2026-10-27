@@ -1,4 +1,8 @@
-langgraph
-langchain-core
-pytest
-typing_extensions
+# Pinned to the versions the tests were run against (Python 3.12).
+langgraph==1.2.16
+langchain-core==1.7.0
+pytest==9.1.1
+typing_extensions==4.16.0
+# Only needed for `benchmark/run_real_loop.py --planner-model openai:...`
+# (and the anthropic / google-genai providers, with their own packages).
+langchain-openai

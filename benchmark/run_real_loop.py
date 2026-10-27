@@ -78,6 +78,27 @@ def _load_planner(spec: str):
     raise ValueError(f"unsupported planner provider: {provider!r}")
 
 
+def _extract_json_array(text: str) -> str:
+    """Pull the JSON array out of a planner reply, fences and prose aside.
+
+    Models commonly wrap the array in a ```json fence or add a sentence
+    around it. Rejecting those replies as unusable would silently turn
+    the treatment arm into the scripted explorer, so strip the fence
+    and take the text from the first "[" to the last "]".
+    """
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        stripped = "\n".join(lines[1:])
+        if stripped.rstrip().endswith("```"):
+            stripped = stripped.rstrip()[:-3]
+    start = stripped.find("[")
+    end = stripped.rfind("]")
+    if start < 0 or end < start:
+        raise ValueError("no JSON array in planner reply")
+    return stripped[start : end + 1]
+
+
 def _planner_from_model(model) -> object:
     """Wrap a chat model as the agent's planner callable.
 
@@ -121,16 +142,20 @@ def _planner_from_model(model) -> object:
                     part.get("text", "") for part in content
                     if isinstance(part, dict)
                 )
-            parsed = _json.loads(content.strip())
+            parsed = _json.loads(_extract_json_array(str(content)))
             calls: list[tuple[str, dict]] = []
             for item in parsed:
                 name, kwargs = item[0], dict(item[1])
                 if name not in ("list_files", "read_file", "write_report"):
                     raise ValueError(f"unknown tool {name!r}")
-                if name in ("read_file", "write_report"):
+                if name == "read_file":
                     path = str(kwargs.get("path", ""))
-                    if not (path.startswith(module_dir + "/") or path.startswith("reports/")):
+                    if not path.startswith(module_dir + "/") or ".." in _Path(path).parts:
                         raise ValueError(f"path outside module: {path!r}")
+                if name == "write_report":
+                    path = str(kwargs.get("path", ""))
+                    if not path.startswith("reports/") or ".." in _Path(path).parts:
+                        raise ValueError(f"path outside reports: {path!r}")
                 calls.append((name, kwargs))
             if not any(n == "write_report" for n, _ in calls):
                 calls.append(("write_report", {"path": f"reports/{module_dir}.md", "content": ""}))
@@ -186,26 +211,23 @@ def main() -> int:
 
     runs: list[dict] = []
     for module in modules:
-        for arm, recall_fn, policy in (
-            ("baseline", lambda t: RecallResult(False, "", "none"), "explorer"),
-            ("treatment", None, "procedure_follower"),
-        ):
+        for arm in ("baseline", "treatment"):
             tracer = MemorableTracer(trace_dir, session_id=f"real-{arm}-{module}")
             tracer.workflow_id = "summarize-python-module"
             task = (f"Summarize the {module} module: list each function "
                     "with a one-line description.")
-            t0 = time.perf_counter()
-            if recall_fn is not None:
-                state = run_agent(task, module_dir=module, root=CORPUS,
-                                  policy=policy, tracer=tracer, recall_fn=recall_fn)
-            elif planner is not None:
-                state = run_agent(task, module_dir=module, root=CORPUS,
-                                  policy=planner, tracer=tracer,
-                                  recall_fn=lambda t: recall_procedure(t))
+            if arm == "baseline":
+                # Same planner as the treatment arm, with recall forced to
+                # a miss. Only the recalled procedure differs between arms.
+                arm_recall_fn = lambda t: RecallResult(False, "", "none")  # noqa: E731
+                arm_policy = planner if planner is not None else "explorer"
             else:
-                state = run_agent(task, module_dir=module, root=CORPUS,
-                                  policy=policy, tracer=tracer,
-                                  recall_fn=lambda t: recall_procedure(t))
+                arm_recall_fn = lambda t: recall_procedure(t)  # noqa: E731
+                arm_policy = planner if planner is not None else "procedure_follower"
+            t0 = time.perf_counter()
+            state = run_agent(task, module_dir=module, root=CORPUS,
+                              policy=arm_policy, tracer=tracer,
+                              recall_fn=arm_recall_fn)
             wall_ms = round((time.perf_counter() - t0) * 1000, 1)
             trace_path = tracer.write_trace()
             ok, msg = tracer.ingest(trace_path)

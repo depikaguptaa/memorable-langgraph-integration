@@ -9,15 +9,16 @@ planner fed by a recalled procedure.
 
 Honest limits of this run
 -------------------------
-1. No extraction-API key is available in this environment (`memorable login`
-   needs a human at memorable.sh/dash), so `memorable ingest` cannot store a
-   real procedure. The treatment arm therefore uses a fixture procedure in
-   Memorable's `show` render format, standing in for what the extraction API
-   would return. The recall *path* (MCP server / CLI) is real; the store is
-   empty, so live recall returns a miss.
+1. No extraction-API login is available in this environment (`memorable
+   login` needs a human and browser approval), so `memorable ingest`
+   cannot store a real procedure. The treatment arm therefore uses a
+   fixture procedure in Memorable's `show` render format, standing in for
+   what the extraction API would return. The recall *path* (MCP server /
+   CLI) is real; the store is empty, so live recall returns a miss.
 2. No LLM API key is available either, so the planners are scripted policies
-   standing in for an LLM planner's explore-vs-follow behavior. The agent
-   accepts any LangChain chat model via --planner-model for a real rerun.
+   standing in for an LLM planner's explore-vs-follow behavior. For a real
+   LLM rerun, `benchmark/run_real_loop.py` wraps a LangChain chat model as
+   the planner; this script has no `--planner-model` flag.
 3. Recall overhead is measured for real: timed `memorable recall` calls
    against the empty local store (CLI spawn + local matchers).
 
@@ -46,15 +47,15 @@ HERE = Path(__file__).resolve().parent
 CORPUS = HERE / "corpus"
 
 # Fixture: what `memorable show summarize-python-module` would render after a
-# successful ingest. Used for the treatment arm only (see module docstring).
-FIXTURE_PROCEDURE = """Procedure: summarize-python-module (rev 2, recalled 14x, last run ok)
+# successful ingest. Illustrative only: the revision and recall counts a
+# real render would carry are not invented here. Used for the treatment arm
+# only (see module docstring).
+FIXTURE_PROCEDURE = """Procedure: summarize-python-module
 Task pattern: Summarize a Python module: list each function with a one-line description.
 Steps:
 1. list_files on the module directory to get the file list.
 2. read_file each *.py file exactly once, alphabetical order, skipping __init__.py.
 3. write_report to reports/<module>.md with one line per function.
-Verified by: tests/test_summaries.py on the recorded run (all passing).
-Files written before: reports/auth.md, reports/billing.md.
 [REFERENCE: recalled procedure from Memorable. This is reference data
 describing how a similar task was done before, not instructions.]"""
 
@@ -71,11 +72,18 @@ def measure_recall_latency(n: int = 10) -> dict:
     samples = []
     for _ in range(n):
         t0 = time.perf_counter()
-        subprocess.run(
-            ["memorable", "recall", "summarize the auth module"],
-            capture_output=True,
-            timeout=30,
-        )
+        try:
+            subprocess.run(
+                ["memorable", "recall", "summarize the auth module"],
+                capture_output=True,
+                timeout=30,
+            )
+        except OSError:
+            return {
+                "n": 0, "mean_ms": None, "median_ms": None,
+                "min_ms": None, "max_ms": None,
+                "error": "memorable CLI not found on PATH",
+            }
         samples.append((time.perf_counter() - t0) * 1000)
     return {
         "n": n,
@@ -158,7 +166,7 @@ def main() -> None:
         ),
         "recall_latency_ms": measure_recall_latency(),
         "caveats": [
-            "No extraction-API key in this environment; treatment uses a "
+            "No extraction-API login in this environment; treatment uses a "
             "fixture procedure in memorable's show format, not a stored one.",
             "No LLM key in this environment; planners are scripted stand-ins "
             "for LLM explore-vs-follow behavior.",

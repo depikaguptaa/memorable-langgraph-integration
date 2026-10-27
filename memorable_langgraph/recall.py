@@ -37,10 +37,9 @@ class RecallResult:
     slug: str = ""
 
 
-MISS_PHRASES = (
+MISS_PREFIXES = (
     "no matching",
-    "no stored procedure matches",
-    "no stored procedure has the slug",
+    "no stored procedure",
     "nothing is stored",
     "nothing stored yet",
     "no chain",
@@ -48,9 +47,18 @@ MISS_PHRASES = (
 )
 
 
+MISS_PHRASES = MISS_PREFIXES  # backwards-compatible name
+
+
 def _is_miss(text: str) -> bool:
-    lowered = text.strip().lower()
-    return not lowered or any(p in lowered for p in MISS_PHRASES)
+    """True only when the reply itself is a miss, not when a procedure
+    happens to mention one of these phrases. Miss replies are short
+    and start with the wording, so only the first line is checked."""
+    lines = [ln.strip().lower() for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        return True
+    first = lines[0]
+    return len(first) <= 120 and first.startswith(MISS_PREFIXES)
 
 
 _SLUG_RE = re.compile(r"\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b")
@@ -239,9 +247,11 @@ GUARDRAIL = (
 )
 
 
-def format_for_injection(result: RecallResult) -> str:
-    if not result.found:
+def format_for_injection(result: RecallResult | None) -> str:
+    if result is None or not result.found:
         return ""
+    if result.text.strip().startswith("[REFERENCE"):
+        return result.text
     return f"{GUARDRAIL}\n{result.text}"
 
 
@@ -273,6 +283,8 @@ def build_recall_node(
         except Exception:
             if not silent:
                 raise
+            return {state_key: ""}
+        if result is None:
             return {state_key: ""}
         return {state_key: format_for_injection(result)}
 
